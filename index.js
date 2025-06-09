@@ -7,33 +7,6 @@ const app = express();
 
 app.use(express.json());
 
-let pets = [
-	{
-		id: 1,
-		name: "Buddy",
-		type: "dog",
-		breed: "Golden Retriever",
-		age: 3,
-		description: "A friendly and energetic dog.",
-	},
-	{
-		id: 2,
-		name: "Whiskers",
-		type: "cat",
-		breed: "Siamese",
-		age: 2,
-		description: "A curious cat who loves to explore.",
-	},
-	{
-		id: 3,
-		name: "Tweety",
-		type: "bird",
-		breed: "Canary",
-		age: 1,
-		description: "A small bird with a big personality.",
-	},
-];
-
 app.get("/", (req, res) => {
 	res.send("Welcome to my API");
 });
@@ -46,13 +19,14 @@ app.get("/hello-pet", (req, res) => {
 	res.send("Hello, Pet");
 });
 
-app.get("/pet", (req, res) => {
+app.get("/pet", async (req, res) => {
+	const pets = await prisma.Pet.findMany();
 	res.status(200).json(pets);
 });
 
-app.get("/pet/:petId", (req, res) => {
+app.get("/pet/:petId", async (req, res) => {
 	const { petId } = req.params;
-	const pet = pets.find((pet) => pet.id == petId);
+	const pet = await prisma.Pet.findUnique({ where: { id: Number(petId) } });
 
 	if (pet) {
 		res.status(200).json(pet);
@@ -61,48 +35,79 @@ app.get("/pet/:petId", (req, res) => {
 	}
 });
 
-app.post("/pet", (req, res) => {
+app.post("/pet", async (req, res) => {
 	const { name, type, breed, age, description } = req.body;
 
-	const newPet = {
-		id: pets.length + 1,
-		name,
-		type,
-		breed,
-		age,
-		description,
-	};
+	if (!name || !type || !breed || age === undefined) {
+		return res.status(400).json({
+			error: "Missing required fields: name, type, breed, and age are required",
+		});
+	}
 
-	pets.push(newPet);
+	if (
+		typeof name !== "string" ||
+		typeof type !== "string" ||
+		typeof breed !== "string" ||
+		(typeof description !== "undefined" && typeof description !== "string") ||
+		typeof age !== "number"
+	) {
+		return res.status(400).json({
+			error:
+				"Invalid field types: name, type, and breed must be strings, age must be a number, and description (if provided) must be a string",
+		});
+	}
+
+	const newPet = await prisma.Pet.create({
+		data: { name, type, breed, age, description },
+	});
 
 	res.status(201).json(newPet);
 });
 
-app.put("/pet/:petId", (req, res) => {
+app.put("/pet/:petId", async (req, res) => {
 	const { petId } = req.params;
 
-	const petIndex = pets.findIndex((pet) => pet.id == parseInt(petId));
+	if (Object.keys(req.body).length === 0) {
+		return res.status(400).json({ error: "No data provided for update" });
+	}
 
-	if (petIndex !== -1) {
-		const updatedPetBody = req.body;
-		pets[petIndex] = { ...pets[petIndex], ...updatedPetBody };
-		res.status(200).json(pets[petIndex]);
-	} else {
+	const { name, type, breed, age, description } = req.body;
+
+	if (name && typeof name !== "string") {
+		return res.status(400).json({ error: "Invalid type for name; expected string" });
+	}
+	if (type && typeof type !== "string") {
+		return res.status(400).json({ error: "Invalid type for type; expected string" });
+	}
+	if (breed && typeof breed !== "string") {
+		return res.status(400).json({ error: "Invalid type for breed; expected string" });
+	}
+	if (age && typeof age !== "number") {
+		return res.status(400).json({ error: "Invalid type for age; expected number" });
+	}
+	if (description && typeof description !== "string") {
+		return res.status(400).json({ error: "Invalid type for description; expected string" });
+	}
+
+	try {
+		const updatedPet = await prisma.Pet.update({
+			where: { id: Number(petId) },
+			data: req.body,
+		});
+		res.status(200).json(updatedPet);
+	} catch (error) {
 		res.status(404).json({ error: "No pet with that ID found" });
 	}
 });
 
-app.delete("/pet/:petId", (req, res) => {
+app.delete("/pet/:petId", async (req, res) => {
 	const { petId } = req.params;
 
-	const initLength = pets.length;
-	pets = pets.filter((pet) => pet.id === petId);
+	const deletedPet = await prisma.Pet.delete({
+		where: { id: Number(petId) },
+	});
 
-	if (pets.length < initLength) {
-		res.status(204).send();
-	} else {
-		res.status(404).json({ error: "No pet with that ID found" });
-	}
+	res.status(200).json(deletedPet);
 });
 
 const PORT = 3000;
