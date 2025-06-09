@@ -59,7 +59,7 @@ app.get("/pet/:petId", (req, res) => {
 });
 
 app.post("/pet", (req, res) => {
-  const { name, type, breed, age, description } = req.body;
+	const { name, type, breed, age, description } = req.body;
 
 	const newPet = {
 		id: pets.length + 1,
@@ -73,6 +73,33 @@ app.post("/pet", (req, res) => {
 	pets.push(newPet);
 
 	res.status(201).json(newPet);
+});
+
+app.put("/pet/:petId", (req, res) => {
+	const { petId } = req.params;
+
+	const petIndex = pets.findIndex((pet) => pet.id == parseInt(petId));
+
+	if (petIndex !== -1) {
+		const updatedPetBody = req.body;
+		pets[petIndex] = { ...pets[petIndex], ...updatedPetBody };
+		res.status(200).json(pets[petIndex]);
+	} else {
+		res.status(404).json({ error: "No pet with that ID found" });
+	}
+});
+
+app.delete("/pet/:petId", (req, res) => {
+	const { petId } = req.params;
+
+	const initLength = pets.length;
+	pets = pets.filter((pet) => pet.id === petId);
+
+	if (pets.length < initLength) {
+		res.status(204).send();
+	} else {
+		res.status(404).json({ error: "No pet with that ID found" });
+	}
 });
 
 const PORT = 3000;
