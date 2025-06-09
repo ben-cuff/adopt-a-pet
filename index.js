@@ -1,11 +1,29 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
+const { NotFoundError } = require("./middleware/custom-errors");
 
 const prisma = new PrismaClient();
 
 const app = express();
 
 app.use(express.json());
+
+app.use((err, req, res, next) => {
+	if (err instanceof ValidationError) {
+		return res.status(err.statusCode).json({ error: err.message });
+	} else if (err instanceof Prisma.PrismaClientKnownRequestError) {
+		// Handle common Prisma errors (e.g., unique constraint violation)
+		if (err.code === "P2002") {
+			return res
+				.status(400)
+				.json({ error: "A unique constraint violation occurred." });
+		}
+	} else if (err instanceof NotFoundError) {
+		return res.status(err.statusCode).json({ error: err.message });
+	}
+
+	res.status(500).json({ error: "Internal Server Error" });
+});
 
 app.get("/", (req, res) => {
 	res.send("Welcome to my API");
@@ -48,12 +66,12 @@ app.post("/pet", async (req, res) => {
 		typeof name !== "string" ||
 		typeof type !== "string" ||
 		typeof breed !== "string" ||
-		(typeof description !== "undefined" && typeof description !== "string") ||
+		(typeof description !== "undefined" &&
+			typeof description !== "string") ||
 		typeof age !== "number"
 	) {
 		return res.status(400).json({
-			error:
-				"Invalid field types: name, type, and breed must be strings, age must be a number, and description (if provided) must be a string",
+			error: "Invalid field types: name, type, and breed must be strings, age must be a number, and description (if provided) must be a string",
 		});
 	}
 
@@ -74,19 +92,29 @@ app.put("/pet/:petId", async (req, res) => {
 	const { name, type, breed, age, description } = req.body;
 
 	if (name && typeof name !== "string") {
-		return res.status(400).json({ error: "Invalid type for name; expected string" });
+		return res
+			.status(400)
+			.json({ error: "Invalid type for name; expected string" });
 	}
 	if (type && typeof type !== "string") {
-		return res.status(400).json({ error: "Invalid type for type; expected string" });
+		return res
+			.status(400)
+			.json({ error: "Invalid type for type; expected string" });
 	}
 	if (breed && typeof breed !== "string") {
-		return res.status(400).json({ error: "Invalid type for breed; expected string" });
+		return res
+			.status(400)
+			.json({ error: "Invalid type for breed; expected string" });
 	}
 	if (age && typeof age !== "number") {
-		return res.status(400).json({ error: "Invalid type for age; expected number" });
+		return res
+			.status(400)
+			.json({ error: "Invalid type for age; expected number" });
 	}
 	if (description && typeof description !== "string") {
-		return res.status(400).json({ error: "Invalid type for description; expected string" });
+		return res
+			.status(400)
+			.json({ error: "Invalid type for description; expected string" });
 	}
 
 	try {
@@ -115,3 +143,5 @@ const PORT = 3000;
 app.listen(PORT, () => {
 	console.log(`Server is running on http://localhost:${PORT}`);
 });
+
+module.exports = app;
